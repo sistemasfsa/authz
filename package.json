@@ -1,0 +1,17 @@
+{
+  "name": "authz-monorepo",
+  "private": true,
+  "workspaces": [
+    "authz-lib",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "npm -w @sistemas-fsa/authz run build",
+    "dev:express": "npm -w authz-express-app run start",
+    "dev:nest": "npm -w authz-nest-app run start",
+    "clean": "rimraf node_modules package-lock.json **/node_modules **/package-lock.json"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1"
+  }
+}
