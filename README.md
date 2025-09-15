@@ -252,6 +252,25 @@ export type AuthContext = {
 
 ---
 
+## Ejemplos locales
+
+En este repo se incluyen ejemplos en `examples/`:
+
+* `mock-issuer/` → Issuer OIDC de prueba (JWKS + emisión de tokens firmados)
+* `express-app/` → mini API Express usando la librería
+* `nest-app/` → mini API NestJS usando la librería
+
+### Scripts sugeridos (root)
+
+```bash
+npm run build         # compila la lib
+npm run start:issuer  # levanta mock issuer en 4444
+npm run start:express # Express en 3001
+npm run start:nest    # Nest en 3002
+```
+
+---
+
 ## Versionado y soporte
 
 * SemVer: `fix` → patch, `feat` → minor, `breaking` → major
