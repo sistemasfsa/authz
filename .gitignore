@@ -2,3 +2,4 @@ token.txt
 node_modules/
 .env
 dist/
+*.tgz
