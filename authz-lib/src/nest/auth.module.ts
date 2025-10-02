@@ -14,7 +14,7 @@ export class AuthModule {
         Reflector,
         ApiJwtGuard,
       ],
-      exports: [ApiJwtGuard],
+      exports: [ApiJwtGuard, AUTH_OPTIONS],
     };
   }
 

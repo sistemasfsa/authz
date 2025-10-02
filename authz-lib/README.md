@@ -76,25 +76,38 @@ La librería trae `jose` como dependencia. Estos paquetes se esperan como *peer*
 
 ```ts
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule, ApiJwtGuard } from '@sistemas-fsa/authz/nest';
 
 @Module({
   imports: [
-    AuthModule.forRoot({
-      issuer: process.env.ISSUER!,                 // p.ej. https://kc/realms/mi-realm
-      audience: process.env.AUDIENCE!,             // p.ej. mi-api
-      allowedAzpDefault: (process.env.ALLOWED_AZP ?? '')
-        .split(',').map(s => s.trim()).filter(Boolean),
-      requireSucursalDataDefault: false,           // default global
-      claimNames: { sucursalId: 'sucursalId', codigoExt: 'codigoExt' },
-      clockTolerance: 10,
+    ConfigModule.forRoot({ isGlobal: true }),
+    AuthModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (cfg: ConfigService) => {
+        const issuer = cfg.get<string>('KC_ISSUER_URL');
+        const audience = cfg.get<string>('KC_AUDIENCE'); // ⚠️ Debe ser tu clientId real (sin <>)
+        if (!issuer) throw new Error('KC_ISSUER_URL no definido');
+        if (!audience) throw new Error('KC_AUDIENCE no definido');
+
+        return {
+          issuer,
+          audience,
+          // opcional: si querés forzar JWKS explícito (sino la lib lo infiere del issuer)
+          jwksUri: cfg.get<string>('KC_JWKS_URI'),
+          allowedAzpDefault: (cfg.get<string>('ALLOWED_AZP') ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+          requireSucursalDataDefault: false,
+          claimNames: { sucursalId: 'sucursalId', codigoExt: 'codigoExt' },
+          clockTolerance: 10,
+        };
+      },
     }),
   ],
-  providers: [
-    { provide: APP_GUARD, useExisting: ApiJwtGuard },
-    ApiJwtGuard,
-  ],
+  providers: [{ provide: APP_GUARD, useExisting: ApiJwtGuard }],
 })
 export class AppModule {}
 ```
