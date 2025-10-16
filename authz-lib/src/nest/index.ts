@@ -1,7 +1,19 @@
-/// <reference path="../types/express-auth.d.ts" />
+// src/index.ts
+export * from "./auth.module";
+export * from "./decorators/auth.decorator";
+export * from "./decorators/authz.decorator";
+export * from "./guards/api-jwt.guard";
+export * from "./tokens";
 
-export * from './auth.module';
-export * from './decorators/auth.decorator';
-export * from './decorators/authz.decorator';
-export * from './guards/api-jwt.guard';
-export * from './tokens.js'; 
+export * from "../admin/authz-kc.module";
+export * from "../admin/authz-admin.module";
+export * from "../admin/authz-kc.service";
+export * from "../admin/manifest.types";
+export * from "../admin/tokens";
+
+export * from "../token/kc-token.module";
+export type {
+  KcTokenService,
+  KcTokenOptions,
+  TokenResponse,
+} from "../token/kc-token.module";

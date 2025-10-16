@@ -1,0 +1,41 @@
+{
+  "realm": "test",
+  "clients": [
+    {
+      "clientId": "frontend-client-id",
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "attributes": {},
+      "defaultRoles": [],
+      "clientRoles": ["reader", "admin"],
+      "protocolMappers": [
+        { "name": "sucursalId", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "claim.name": "sucursalId", "user.attribute": "sucursalId", "jsonType.label": "String", "id.token.claim": "true", "access.token.claim": "true" } },
+        { "name": "codigoExt", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "claim.name": "codigoExt", "user.attribute": "codigoExt", "jsonType.label": "String", "id.token.claim": "true", "access.token.claim": "true" } }
+      ]
+    },
+    {
+      "clientId": "api-client-id",
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "serviceAccountsEnabled": true,
+      "bearerOnly": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "api-secret-CHANGE",
+      "clientRoles": ["reader", "admin"],
+      "protocolMappers": []
+    }
+  ],
+  "tokenExchange": [
+    {
+      "fromClientId": "frontend-client-id",
+      "toClientId": "api-client-id",
+      "allowed": true
+    }
+  ]
+}

@@ -18,7 +18,7 @@ export function authorize(policy: AuthzPolicy) {
     if (policy.requiredClientRoles) {
       for (const [clientId, roles] of Object.entries(policy.requiredClientRoles)) {
         const clientRoles = auth.clientRoles?.[clientId] ?? [];
-        const ok = roles.some((r) => clientRoles.includes(r));
+        const ok = roles.every((r) => clientRoles.includes(r));
         if (!ok) return res.status(403).json({ error: `Missing client role(s) on ${clientId}` });
       }
     }
