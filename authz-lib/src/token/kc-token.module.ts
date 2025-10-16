@@ -1,29 +1,8 @@
 // src/token/kc-token.module.ts
 import { DynamicModule, Module } from '@nestjs/common';
 import { KcTokenExchangeService } from './kc-token-exchange.service';
-
-export interface KcTokenOptions {
-  baseUrl: string;  // https://kc.example.com
-  realm: string;    // my-realm
-  clientId: string; // public/confidential (lo habitual: confidential)
-  clientSecret: string;
-  timeoutMs?: number;
-  scope?: string;   // opcional: "openid profile"
-}
-
-export const KC_TOKEN_OPTS = Symbol('KC_TOKEN_OPTS');
-export const KC_TOKEN_SVC  = Symbol('KC_TOKEN_SVC');
-
-export interface TokenResponse {
-  access_token: string;
-  expires_in: number;
-  token_type: string;
-  scope?: string;
-}
-
-export interface KcTokenService {
-  getToken(scopeOverride?: string): Promise<TokenResponse>;
-}
+import { KC_TOKEN_OPTS } from '../nest';
+import { KC_TOKEN_SVC, KcTokenOptions, KcTokenService, TokenResponse } from '../nest/tokens';
 
 @Module({})
 export class KcTokenModule {

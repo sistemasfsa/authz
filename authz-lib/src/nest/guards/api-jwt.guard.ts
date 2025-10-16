@@ -44,6 +44,12 @@ export class ApiJwtGuard implements CanActivate {
   }
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>("isPublic", [
+      ctx.getHandler(),
+      ctx.getClass(),
+    ]);
+    if (isPublic) return true;
+    
     const req = ctx.switchToHttp().getRequest();
     const raw = req.headers["authorization"];
     const hdr = Array.isArray(raw) ? raw[0] : raw;

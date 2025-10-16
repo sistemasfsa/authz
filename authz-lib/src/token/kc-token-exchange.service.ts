@@ -1,7 +1,7 @@
 // src/token/kc-token-exchange.service.ts
 import { Inject, Injectable } from '@nestjs/common';
-import type { TokenResponse } from './kc-token.module';
-import { KC_TOKEN_OPTS, KcTokenOptions } from './kc-token.module';
+import { KC_TOKEN_OPTS } from '../nest/tokens';
+import { KcTokenOptions, TokenResponse } from '../nest/tokens';
 
 @Injectable()
 export class KcTokenExchangeService {
