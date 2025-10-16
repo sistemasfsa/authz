@@ -1,42 +1,71 @@
-// src/token/kc-token.module.ts
-import { DynamicModule, Module } from '@nestjs/common';
-import { KcTokenExchangeService } from './kc-token-exchange.service';
-import { KC_TOKEN_OPTS } from '../nest';
-import { KC_TOKEN_SVC, KcTokenOptions, KcTokenService, TokenResponse } from '../nest/tokens';
+import { DynamicModule, Module } from "@nestjs/common";
+import { KcTokenExchangeService } from "./kc-token-exchange.service";
+import {
+  KC_TOKEN_OPTS,
+  KC_TOKEN_SVC,
+  KcTokenOptions,
+  KcTokenService,
+  TokenResponse,
+} from "../nest/tokens";
 
 @Module({})
 export class KcTokenModule {
   static forRoot(opts: KcTokenOptions): DynamicModule {
+    return this._base({
+      optsProvider: { provide: KC_TOKEN_OPTS, useValue: opts },
+    });
+  }
+
+  static forRootAsync(input: {
+    useFactory: (...args: any[]) => Promise<KcTokenOptions> | KcTokenOptions;
+    inject?: any[];
+  }): DynamicModule {
+    return this._base({
+      optsProvider: {
+        provide: KC_TOKEN_OPTS,
+        useFactory: input.useFactory,
+        inject: input.inject ?? [],
+      },
+    });
+  }
+
+  private static _base({ optsProvider }: { optsProvider: any }): DynamicModule {
     return {
       module: KcTokenModule,
       providers: [
-        { provide: KC_TOKEN_OPTS, useValue: opts },
+        optsProvider,
         {
           provide: KC_TOKEN_SVC,
           useFactory: (o: KcTokenOptions): KcTokenService => {
             let cached: { token: TokenResponse; expAt: number } | null = null;
 
             async function fetchToken(scope?: string): Promise<TokenResponse> {
-              const url = `${o.baseUrl}/realms/${encodeURIComponent(o.realm)}/protocol/openid-connect/token`;
+              const url = `${o.baseUrl}/realms/${encodeURIComponent(
+                o.realm
+              )}/protocol/openid-connect/token`;
               const body = new URLSearchParams({
-                grant_type: 'client_credentials',
+                grant_type: "client_credentials",
                 client_id: o.clientId,
                 client_secret: o.clientSecret,
               });
-              if (scope ?? o.scope) body.set('scope', scope ?? o.scope!);
+              if (scope ?? o.scope) body.set("scope", scope ?? o.scope!);
 
               const controller = new AbortController();
-              const to = setTimeout(() => controller.abort(), o.timeoutMs ?? 10000);
+              const to = setTimeout(
+                () => controller.abort(),
+                o.timeoutMs ?? 10000
+              );
               try {
                 const res = await fetch(url, {
-                  method: 'POST',
-                  headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                  method: "POST",
+                  headers: {
+                    "content-type": "application/x-www-form-urlencoded",
+                  },
                   body: body.toString(),
                   signal: controller.signal,
                 });
                 if (!res.ok) throw new Error(`Token HTTP ${res.status}`);
-                const json = (await res.json()) as TokenResponse;
-                return json;
+                return (await res.json()) as TokenResponse;
               } finally {
                 clearTimeout(to);
               }
@@ -45,11 +74,9 @@ export class KcTokenModule {
             return {
               async getToken(scopeOverride?: string): Promise<TokenResponse> {
                 const now = Date.now();
-                if (cached && cached.expAt - now > 30_000) {
-                  return cached.token;
-                }
+                if (cached && cached.expAt - now > 30_000) return cached.token;
                 const t = await fetchToken(scopeOverride);
-                cached = { token: t, expAt: now + (t.expires_in * 1000) };
+                cached = { token: t, expAt: now + t.expires_in * 1000 };
                 return t;
               },
             };
