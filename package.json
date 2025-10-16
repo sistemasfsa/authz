@@ -9,14 +9,28 @@
     "build": "npm -w @sistemas-fsa/authz run build",
     "dev:express": "npm -w authz-express-app run start",
     "dev:nest": "npm -w authz-nest-app run start",
+    "dev:issuer": "node examples/mock-issuer/index.mjs",
+    "dev:clientes": "cd examples/clientes-app && cross-env CLIENTES_PORT=3005 CLIENTES_AUDIENCE=clientes-backend tsx src/main.ts",
+    "dev:cronicos": "cd examples/cronicos-app && cross-env CRONICOS_PORT=3002 ISSUER=http://localhost:4444/realms/test FRONT_CLIENT=frontend-client-id CLIENT_ID=cronicos-backend CLIENT_SECRET=cronicos-secret tsx src/main.ts",
+    "dev:all": "concurrently -k -n issuer,clientes,cronicos -c yellow,cyan,magenta \"npm run dev:issuer\" \"npm run dev:clientes\" \"npm run dev:cronicos\"",
     "clean": "rimraf node_modules package-lock.json **/node_modules **/package-lock.json"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
-    "rimraf": "^6.0.1"
+    "@types/node": "^20.14.9",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.6.3"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^26.0.0",
+    "axios": "^1.12.2",
+    "express": "^5.1.0",
+    "jose": "^6.1.0",
+    "jwt-decode": "^4.0.0",
     "keycloak-admin-client": "^0.12.0",
     "yaml": "^2.8.1"
   }
