@@ -1,11 +1,11 @@
 // src/runtime/authz-kc.module.ts
-import { DynamicModule, Global, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { DynamicModule, Global, MiddlewareConsumer, Module, NestModule, Provider } from '@nestjs/common';
 import { AuthzCoreConfig, AuthzRuntimeConfig, DownstreamConfig } from './types';
 import { KcHttp } from './kc-http';
 import { TokenExchangeService } from './token-exchange.service';
 import { DownstreamFactory } from './downstream.factory';
 import { RequestContextMiddleware } from '../middlewares/request-context.middleware';
-import { CORE_CONFIG, RUNTIME_CONFIG } from '../tokens';
+import { ASYNC_CFG, CORE_CONFIG, RUNTIME_CONFIG } from '../tokens';
 
 export const DownstreamToken = (name: string) => `DOWNSTREAM_${name.toUpperCase()}`;
 
@@ -25,65 +25,90 @@ export class AuthzKcRuntimeModule implements NestModule {
     useFactory: (...args: any[]) => Promise<{ core: AuthzCoreConfig; runtime: AuthzRuntimeConfig }> | { core: AuthzCoreConfig; runtime: AuthzRuntimeConfig };
     inject?: any[];
     imports?: any[]; // p.ej. ConfigModule
+    namesFactory: (...args: any[]) => Promise<string[]> | string[];
   }): DynamicModule {
-    const runtimeHolder = { current: undefined as undefined | AuthzRuntimeConfig };
+    // 1) Resolver config async una sola vez
+    const asyncConfigProvider: Provider = {
+      provide: ASYNC_CFG,
+      useFactory: input.useFactory,
+      inject: input.inject ?? [],
+    };
 
-    const coreProvider = {
+    // 2) Providers de config derivados del ASYNC_CFG (¡no volvemos a ejecutar useFactory!)
+    const coreProvider: Provider = {
       provide: CORE_CONFIG,
-      useFactory: async (...args: any[]) => {
-        const res = await input.useFactory(...args);
-        runtimeHolder.current = res.runtime;
-        return res.core;
-      },
-      inject: input.inject ?? [],
+      useFactory: (cfg: { core: AuthzCoreConfig }) => cfg.core,
+      inject: [ASYNC_CFG],
     };
 
-    const runtimeProvider = {
+    const runtimeProvider: Provider = {
       provide: RUNTIME_CONFIG,
-      useFactory: async (...args: any[]) => {
-        const res = await input.useFactory(...args);
-        runtimeHolder.current = res.runtime;
-        return res.runtime;
-      },
-      inject: input.inject ?? [],
+      useFactory: (cfg: { runtime: AuthzRuntimeConfig }) => cfg.runtime,
+      inject: [ASYNC_CFG],
     };
 
-    // ⚠️ Los downstream providers dependen del runtime ya resuelto.
-    // Creamos un factory que se arma en tiempo de módulo.
-    const dynamicDownstreamsFactory = {
-      provide: 'RUNTIME_DOWNSTREAM_PROVIDERS',
-      useFactory: (factory: DownstreamFactory) => {
-        const rt = runtimeHolder.current!;
-        return (rt.downstreams ?? []).map((d: DownstreamConfig) => ({
-          provide: DownstreamToken(d.name),
-          useFactory: (f: DownstreamFactory) => f.build(d),
-          inject: [DownstreamFactory],
-        }));
-      },
-      inject: [DownstreamFactory],
+    // 3) Infra base
+    const kcProvider: Provider = {
+      provide: KcHttp,
+      useFactory: (cfg: AuthzCoreConfig) => new KcHttp(cfg),
+      inject: [CORE_CONFIG],
     };
 
+    const exProvider: Provider = {
+      provide: TokenExchangeService,
+      useFactory: (cfg: AuthzCoreConfig, kc: KcHttp) => new TokenExchangeService(cfg, kc),
+      inject: [CORE_CONFIG, KcHttp],
+    };
+
+    const factoryProvider: Provider = {
+      provide: DownstreamFactory,
+      useFactory: (ex: TokenExchangeService) => new DownstreamFactory(ex),
+      inject: [TokenExchangeService],
+    };
+
+    // 4) Declaración de tokens DOWNSTREAM_* en tiempo de construcción del módulo
+    //    Tomamos los nombres desde namesFactory (se asume función pura o que no requiere DI directo aquí).
+    //    Cada provider resuelve su config real leyendo RUNTIME_CONFIG en su propio useFactory.
+    const declaredNames = (() => {
+      // Si namesFactory necesita DI, el consumidor puede pasar una función pura que lea de env
+      // o comparta helper con useFactory. Aquí la ejecutamos sin args por diseño.
+      const res = input.namesFactory?.() ?? [];
+      if (res instanceof Promise) {
+        throw new Error('namesFactory no debe ser asíncrona a la hora de declarar providers. Devuelve string[] sincrónico.');
+      }
+      return res;
+    })();
+
+    const downstreamProviders: Provider[] = declaredNames.map((name) => ({
+      provide: DownstreamToken(name),
+      useFactory: (rt: AuthzRuntimeConfig, factory: DownstreamFactory) => {
+        const def = (rt.downstreams ?? []).find((d: DownstreamConfig) => d.name === name);
+        if (!def) {
+          throw new Error(`Downstream "${name}" no está definido en runtime.downstreams`);
+        }
+        return factory.build(def);
+      },
+      inject: [RUNTIME_CONFIG, DownstreamFactory],
+    }));
+
+    // 5) Armamos el módulo final reutilizando _base (sin runtime directo)
     const base = this._base({
       coreProvider,
       runtimeProvider,
       runtime: undefined as any, // se inyecta en runtimeProvider
-      extraProviders: [dynamicDownstreamsFactory],
-      extraExports: [], // exportamos abajo los tokens generados
+      extraProviders: [
+        asyncConfigProvider,
+        kcProvider,
+        exProvider,
+        factoryProvider,
+        ...downstreamProviders,
+      ],
+      extraExports: [
+        ...declaredNames.map((n) => DownstreamToken(n)),
+        TokenExchangeService,
+      ],
       extraImports: input.imports ?? [],
     });
-
-    // Inyectamos los downstream providers generados
-    base.providers!.push({
-      provide: 'DOWNSTREAMS_REGISTER',
-      useFactory: (moduleRef: any, defs: any[]) => {
-        // Nest registrará estos providers al construir el módulo (no necesitas nada acá)
-        return true;
-      },
-      inject: ['RUNTIME_DOWNSTREAM_PROVIDERS'],
-    });
-
-    // Exportar dinámicamente los tokens DOWNSTREAM_*
-    base.exports!.push('RUNTIME_DOWNSTREAM_PROVIDERS');
 
     return base;
   }

@@ -3,6 +3,7 @@ export const AUTH_OPTIONS = 'AUTH_OPTIONS';
 
 export const CORE_CONFIG = 'CORE_CONFIG';
 export const RUNTIME_CONFIG = 'RUNTIME_CONFIG';
+export const ASYNC_CFG = 'AUTHZ_ASYNC_CONFIG';
 
 // src/token/kc-token.tokens.ts
 export const KC_TOKEN_OPTS = 'KC_TOKEN_OPTS';
