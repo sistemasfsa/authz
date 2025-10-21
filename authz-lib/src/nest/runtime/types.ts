@@ -26,6 +26,7 @@ export type AuthzRuntimeConfig = {
 export type ExchangeResult = {
   access_token: string;
   expires_in: number;
+  refresh_token?: string;
   issued_token_type?: string;
   token_type: "Bearer" | string;
   scope?: string;
