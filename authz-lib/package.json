@@ -1,6 +1,6 @@
 {
   "name": "@sistemas-fsa/authz",
-  "version": "1.4.6",
+  "version": "1.4.8",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

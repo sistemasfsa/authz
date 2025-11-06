@@ -1,22 +1,26 @@
 // src/auth/auth.module.ts
-import { DynamicModule, Module } from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
+import { DynamicModule, Module, Provider } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { AUTH_OPTIONS } from "./tokens.js";
 import type { AuthModuleOptions } from "../shared/contracts.js";
 import { ApiJwtGuard } from "./guards/api-jwt.guard.js";
-
 import { AuthzAdminModule } from "../admin/authz-admin.module.js";
 import type { AdminConfig } from "../admin/admin-config.types.js";
 
 @Module({})
 export class AuthModule {
   static forRoot(opts: AuthModuleOptions, admin?: AdminConfig): DynamicModule {
+    const apiJwtGlobal: Provider = {
+      provide: APP_GUARD,
+      useClass: ApiJwtGuard,
+    };
+
     const base: DynamicModule = {
       module: AuthModule,
       providers: [
         { provide: AUTH_OPTIONS, useValue: opts },
-        Reflector,
         ApiJwtGuard,
+        apiJwtGlobal, // ✅ ahora sí global
       ],
       exports: [ApiJwtGuard, AUTH_OPTIONS],
     };
@@ -53,6 +57,11 @@ export class AuthModule {
     },
     admin?: AdminConfig
   ): DynamicModule {
+    const apiJwtGlobal: Provider = {
+      provide: APP_GUARD,
+      useClass: ApiJwtGuard,
+    };
+
     const base: DynamicModule = {
       module: AuthModule,
       providers: [
@@ -61,8 +70,8 @@ export class AuthModule {
           useFactory: factory.useFactory,
           inject: factory.inject ?? [],
         },
-        Reflector,
         ApiJwtGuard,
+        apiJwtGlobal, // ✅ global en la variante async también
       ],
       exports: [ApiJwtGuard, AUTH_OPTIONS],
     };
