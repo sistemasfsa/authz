@@ -35,7 +35,7 @@ export class ApiJwtGuard implements CanActivate {
 
   constructor(
     @Inject(AUTH_OPTIONS) private readonly opts: AuthModuleOptions,
-    private readonly reflector: Reflector
+    @Inject(Reflector) private readonly reflector: Reflector
   ) {
     this.jwks = jose.createRemoteJWKSet(
       new URL(`${opts.issuer}/protocol/openid-connect/certs`)
