@@ -1,5 +1,5 @@
 import { Controller, Get, Post } from '@nestjs/common';
-import { Authz } from '@sistemas-fsa/authz/nest';
+import { Authz, Perms } from '@sistemas-fsa/authz/nest';
 
 const FRONT_CLIENT = process.env.FRONT_CLIENT || 'frontend-client-id';
 
@@ -11,6 +11,7 @@ const FRONT_CLIENT = process.env.FRONT_CLIENT || 'frontend-client-id';
 })
 export class ItemsController {
   @Get()
+  @Perms('items:read')
   list() {
     return { ok: true };
   }

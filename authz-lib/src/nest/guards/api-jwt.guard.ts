@@ -12,6 +12,7 @@ import * as jose from "jose";
 import type { AuthModuleOptions, AuthzPolicy } from "../../shared/contracts";
 import { AUTHZ_KEY } from "../decorators/authz.decorator";
 import { AUTH_OPTIONS } from "../tokens";
+import { CLIENT_PERMS_KEY } from "../decorators/perms.decorator";
 
 type RealmAccess = { roles?: string[] };
 type ResourceAccess = { [clientId: string]: { roles?: string[] } };
@@ -34,7 +35,7 @@ export class ApiJwtGuard implements CanActivate {
 
   constructor(
     @Inject(AUTH_OPTIONS) private readonly opts: AuthModuleOptions,
-    @Inject(Reflector) private readonly reflector: Reflector
+    private readonly reflector: Reflector
   ) {
     this.jwks = jose.createRemoteJWKSet(
       new URL(`${opts.issuer}/protocol/openid-connect/certs`)
@@ -44,12 +45,14 @@ export class ApiJwtGuard implements CanActivate {
   }
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    // 1) Rutas públicas
     const isPublic = this.reflector.getAllAndOverride<boolean>("isPublic", [
       ctx.getHandler(),
       ctx.getClass(),
     ]);
     if (isPublic) return true;
-    
+
+    // 2) Extraer y verificar JWT
     const req = ctx.switchToHttp().getRequest();
     const raw = req.headers["authorization"];
     const hdr = Array.isArray(raw) ? raw[0] : raw;
@@ -70,20 +73,52 @@ export class ApiJwtGuard implements CanActivate {
       throw new UnauthorizedException(err);
     }
 
+    // 3) Validar audience
     const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     if (!aud.includes(this.opts.audience)) {
       throw new ForbiddenException("Invalid audience for API");
     }
 
+    // 4) Construir policy efectiva (Authz + ClientPerms fusionados)
     const defaultPolicy: AuthzPolicy = {
       allowedAzp: this.opts.allowedAzpDefault,
       requireSucursalData: this.opts.requireSucursalDataDefault ?? false,
     };
-    const policy =
+
+    const policyRaw =
       this.reflector.get<AuthzPolicy>(AUTHZ_KEY, ctx.getHandler()) ??
       this.reflector.get<AuthzPolicy>(AUTHZ_KEY, ctx.getClass()) ??
       defaultPolicy;
 
+    // Permisos declarados con @ClientPerms en clase y método (se fusionan)
+    const handlerPerms =
+      this.reflector.get<string[]>(CLIENT_PERMS_KEY, ctx.getHandler()) ?? [];
+    const classPerms =
+      this.reflector.get<string[]>(CLIENT_PERMS_KEY, ctx.getClass()) ?? [];
+    const mergedClientPerms = Array.from(
+      new Set([...classPerms, ...handlerPerms])
+    );
+
+    // Normalizar requiredClientRoles: agregar los perms de @ClientPerms al audience actual
+    const audience = this.opts.audience;
+    const normalizedReqClientRoles: Record<string, string[]> =
+      policyRaw.requiredClientRoles ? { ...policyRaw.requiredClientRoles } : {};
+
+    if (mergedClientPerms.length) {
+      const prev = normalizedReqClientRoles[audience] ?? [];
+      normalizedReqClientRoles[audience] = Array.from(
+        new Set([...prev, ...mergedClientPerms])
+      );
+    }
+
+    const policy: AuthzPolicy = {
+      ...policyRaw,
+      requiredClientRoles: Object.keys(normalizedReqClientRoles).length
+        ? normalizedReqClientRoles
+        : policyRaw.requiredClientRoles,
+    };
+
+    // 5) Validaciones de policy
     if (policy.allowedAzp?.length) {
       if (!payload.azp || !policy.allowedAzp.includes(payload.azp)) {
         throw new ForbiddenException("AZP not allowed for this route");
@@ -108,6 +143,7 @@ export class ApiJwtGuard implements CanActivate {
       }
     }
 
+    // 6) Datos de sucursal (si corresponde)
     const mustSucursal =
       policy.requireSucursalData ??
       this.opts.requireSucursalDataDefault ??
@@ -118,6 +154,7 @@ export class ApiJwtGuard implements CanActivate {
       throw new ForbiddenException("Missing sucursal codes");
     }
 
+    // 7) Armar contexto compacto
     const resourceAccess = payload.resource_access ?? {};
     req.auth = {
       sub: String(payload.sub ?? ""),
@@ -132,6 +169,7 @@ export class ApiJwtGuard implements CanActivate {
         ])
       ),
     };
+
     return true;
   }
 }
